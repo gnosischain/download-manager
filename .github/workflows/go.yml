@@ -19,6 +19,9 @@ jobs:
     - name: Download Dependencies
       run: go mod download
 
+    - name: Tidy Dependencies
+      run: go mod tidy
+
     - name: Build
       run: go build -o ./download-manager -gcflags=-trimpath=$GOPATH -asmflags=-trimpath=$GOPATH
 
