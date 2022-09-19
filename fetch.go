@@ -121,9 +121,9 @@ func FetchFile() func(c *cli.Context) error {
 			return nil
 		}
 
-		// downloadWithoutResume(length, urlInput, filename, path)
+		downloadWithoutResume(length, urlInput, filename, path)
 
-		downloadWithParty(length, urlInput, filename, path)
+		// downloadWithParty(length, urlInput, filename, path)
 
 		return nil
 	}
