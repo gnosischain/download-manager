@@ -5,6 +5,10 @@ Utility CLI to facilitate downloads of big files in chunks.
 
 # How to use it
 
+Download the CLI 
+
+- `curl https://raw.githubusercontent.com/gnosischain/download-manager/main/releases/linux/amd64/download-manager --output ./download-manager`
+
 Make it executable
 
 - `chmod +x ./download-manager`
