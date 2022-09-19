@@ -1,6 +1,6 @@
 module github.com/gnosischain/download-manager
 
-go 1.16
+go 1.19
 
 require (
 	github.com/VividCortex/ewma v1.2.0
