@@ -21,9 +21,12 @@ jobs:
 
     - name: Build
       run: go build -o ./download-manager -gcflags=-trimpath=$GOPATH -asmflags=-trimpath=$GOPATH
+
+    - name: Make it executable
+      run: chmod +x ./download-manager
     
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v3.1.0
       with: 
-        name: download-manager
+        name: download-manager-linux-amd64
         path: ./download-manager
