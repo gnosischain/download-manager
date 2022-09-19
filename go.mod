@@ -1,4 +1,4 @@
-module github.com/squareomatic/download-manager
+module github.com/gnosischain/download-manager
 
 go 1.16
 
