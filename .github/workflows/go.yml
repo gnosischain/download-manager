@@ -28,5 +28,6 @@ jobs:
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v3.1.0
       with: 
-        name: download-manager-linux-amd64
+        name: download-manager
         path: ./download-manager
+        retention-days: 14
