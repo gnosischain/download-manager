@@ -16,6 +16,9 @@ jobs:
       with:
         go-version: 1.18
 
+    - name: Init
+      run: go mod init
+
     - name: Build
       run: go build -o ./download-manager -gcflags=-trimpath=$GOPATH -asmflags=-trimpath=$GOPATH
     
