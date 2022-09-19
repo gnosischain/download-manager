@@ -2,7 +2,7 @@ name: Build And Publish Download Manager
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "multipart" ]
 
 jobs:
 

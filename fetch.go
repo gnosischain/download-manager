@@ -18,12 +18,12 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/urfave/cli"
-	"github.com/vbauerster/getparty"
 )
 
 const FiveGB = 5000000000
+const TenMB = 10000000
 
-const downloadPartLimitInBytes = FiveGB
+const downloadPartLimitInBytes = TenMB
 
 var wg sync.WaitGroup
 
@@ -148,7 +148,7 @@ func downloadWithParty(length int, urlInput string, filename string, path string
 	ctx, cancel := backgroundContext()
 	defer cancel()
 
-	cmd := &getparty.Cmd{
+	cmd := &Cmd{
 		Ctx: ctx,
 		Out: os.Stdout,
 		Err: os.Stderr,
