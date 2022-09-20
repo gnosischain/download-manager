@@ -20,7 +20,7 @@ import (
 const FiveGB = 5000000000
 const InMB = 100000000
 
-const downloadPartLimitInBytes = InMB
+const downloadPartLimitInBytes = FiveGB
 
 var wg sync.WaitGroup
 
@@ -135,6 +135,17 @@ func FetchFile() func(c *cli.Context) error {
 		// compute parts
 		parts := length / downloadPartLimitInBytes
 
+		// download it all at once no need to download in parts
+		// in case file size is less than download part limit in bytes
+		if length < downloadPartLimitInBytes {
+			parts = 1
+		}
+
+		if fromPart > parts {
+			ErrorLog("Part from where to start cannot be higher than total parts amount\n")
+			return nil
+		}
+
 		downloadWithCustomMultipart(fromPart, length, parts, urlInput, filename, path)
 
 		// Create final file
@@ -178,15 +189,12 @@ func downloadWithCustomMultipart(fromPart int, length int, parts int, urlInput s
 	diff := length % downloadPartLimitInBytes
 	lensub := downloadPartLimitInBytes
 
-	// download it all at once no need to download in parts
-	// in case file size is less than download part limit in bytes
-	// if length < downloadPartLimitInBytes {
-	// 	parts = 1
-	// 	diff = 0
-	// 	lensub = length
-	// }
+	if parts == 1 {
+		diff = 0
+		lensub = length
+	}
 
-	SimpleLog("Will fetch file %s in %d parts of about %s and reminder of about %s ...\n\n", filename, parts, humanize.Bytes(uint64(lensub)), humanize.Bytes(uint64(diff)))
+	SimpleLog("Will fetch file %s from part %d to part %d of about %s and reminder of about %s ...\n\n", filename, fromPart, parts, humanize.Bytes(uint64(lensub)), humanize.Bytes(uint64(diff)))
 	wg.Add(parts - fromPart)
 	waitChan := make(chan struct{}, 3) // max concurrent part downloads
 	for i := fromPart; i < parts; i++ {
