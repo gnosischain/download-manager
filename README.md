@@ -5,9 +5,13 @@ Utility CLI to facilitate downloads of big files in chunks.
 
 # How to use it
 
-Download the CLI
+Download the CLI from `main` branch (does not support resume download from part)
 
 - `curl https://raw.githubusercontent.com/gnosischain/download-manager/main/releases/linux/amd64/download-manager --output ./download-manager`
+
+[Experimental] Download the CLI from `multipart` branch (does not support resume download from part)
+
+- `curl https://raw.githubusercontent.com/gnosischain/download-manager/multipart/releases/linux/amd64/download-manager --output ./download-manager`
 
 Make it executable
 
