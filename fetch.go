@@ -2,28 +2,25 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 
 	"github.com/dustin/go-humanize"
 	"github.com/urfave/cli"
 )
 
 const FiveGB = 5000000000
-const TenMB = 10000000
+const InMB = 100000000
 
-const downloadPartLimitInBytes = TenMB
+const downloadPartLimitInBytes = InMB
 
 var wg sync.WaitGroup
 
@@ -34,6 +31,13 @@ func FetchFile() func(c *cli.Context) error {
 		if errWd != nil {
 			ErrorLog("Could not get current working directory")
 			return nil
+		}
+
+		fromPart := c.Int("p") // index part from where to start
+
+		concurrency := c.Int("c")
+		if concurrency == 0 {
+			concurrency = 3
 		}
 
 		urlInput := c.String("u")
@@ -61,6 +65,7 @@ func FetchFile() func(c *cli.Context) error {
 			return nil
 		}
 
+		// var directory string = path
 		path = filepath.Join(path, filename)
 
 		InfoLog("\nDownloading %s ...\n\n", urlInput)
@@ -70,6 +75,11 @@ func FetchFile() func(c *cli.Context) error {
 		range_header := "bytes=0-0"
 		req.Header.Add("Range", range_header)
 		resp, _ := client.Do(req)
+
+		// for k, v := range resp.Header {
+		// 	log.Print(k)
+		// 	log.Print(v)
+		// }
 
 		if server, ok := resp.Header["Server"]; ok {
 			if len(server) != 0 {
@@ -85,7 +95,7 @@ func FetchFile() func(c *cli.Context) error {
 			if len(etag) != 0 {
 				val := etag[0]
 				if val != "" {
-					WarningLog("Etag: %s\n\n", strings.Replace(val, "\"", "", -1))
+					SimpleLog("Etag: %s\n", strings.Replace(val, "\"", "", -1))
 				}
 			}
 		}
@@ -94,7 +104,7 @@ func FetchFile() func(c *cli.Context) error {
 			if len(lastModified) != 0 {
 				val := lastModified[0]
 				if val != "" {
-					WarningLog("Last Modified: %s\n\n", val)
+					SimpleLog("Last Modified: %s\n", val)
 				}
 			}
 		}
@@ -104,6 +114,7 @@ func FetchFile() func(c *cli.Context) error {
 
 		if contentRange, ok := resp.Header["Content-Range"]; ok {
 			if len(contentRange) != 0 {
+				log.Print(contentRange[0])
 				val := contentRange[0]
 				if val != "" {
 					lengthString := strings.Replace(val, "bytes 0-0/", "", 1)
@@ -112,7 +123,7 @@ func FetchFile() func(c *cli.Context) error {
 						ErrorLog("Could not get file content range")
 						return nil
 					} else {
-						WarningLog("Size: %s\n\n", humanize.Bytes(uint64(length)))
+						SimpleLog("Size: %s\n", humanize.Bytes(uint64(length)))
 					}
 				}
 			}
@@ -121,132 +132,120 @@ func FetchFile() func(c *cli.Context) error {
 			return nil
 		}
 
-		// downloadWithoutResume(length, urlInput, filename, path)
+		// compute parts
+		parts := length / downloadPartLimitInBytes
 
-		downloadWithParty(length, urlInput, filename, path)
+		downloadWithCustomMultipart(fromPart, length, parts, urlInput, filename, path)
+
+		// Create final file
+		out, errTotalFile := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
+		if errTotalFile != nil {
+			ErrorLog("failed to create file %s: %s", path, errTotalFile)
+			return nil
+		}
+		defer out.Close()
+
+		for i := 0; i < parts; i++ {
+
+			f := fmt.Sprintf("%s.%d", path, i)
+			val, err := os.Open(f)
+			if err != nil {
+				ErrorLog("failed to read %s: %s", f, err.Error())
+				break
+			}
+			defer val.Close()
+
+			_, errMergeChunk := io.Copy(out, val)
+			if errMergeChunk != nil {
+				ErrorLog("failed to append chunk %s: %s", f, errMergeChunk.Error())
+				break
+			}
+
+			errDeleteChunk := os.Remove(f)
+			if errDeleteChunk != nil {
+				ErrorLog("failed to delete chunk %s: %s", f, errDeleteChunk.Error())
+				break
+			}
+
+		}
 
 		return nil
 	}
 }
 
-func downloadWithParty(length int, urlInput string, filename string, path string) {
+func downloadWithCustomMultipart(fromPart int, length int, parts int, urlInput string, filename string, path string) {
 
-	// compute parts
-	parts := length / downloadPartLimitInBytes
-	// diff := length % downloadPartLimitInBytes
-	// lensub := downloadPartLimitInBytes
-
-	// download it all at once no need to download in parts
-	// in case file size is less than download part limit in bytes
-	if length < downloadPartLimitInBytes {
-		parts = 1
-		// diff = 0
-		// lensub = length
-	}
-
-	runtime.MemProfileRate = 0
-	ctx, cancel := backgroundContext()
-	defer cancel()
-
-	cmd := &Cmd{
-		Ctx: ctx,
-		Out: os.Stdout,
-		Err: os.Stderr,
-	}
-
-	arguments := make([]string, 0, 0)
-	arguments = append(arguments, urlInput)
-	arguments = append(arguments, fmt.Sprintf("-p=%d", parts)) // parts
-	arguments = append(arguments, fmt.Sprintf("-r=%d", 3))     // max retries per part
-	arguments = append(arguments, fmt.Sprintf("-t=%d", 15))    // timeout
-	arguments = append(arguments, fmt.Sprintf("-o=%s", path))  // output path
-	// arguments = append(arguments, fmt.Sprintf("-s=download.json")) // output path for download session
-
-	if err := cmd.Run(arguments, "dev", "xxxxx"); err != nil {
-		ErrorLog("Error: %s", err)
-	}
-}
-
-func backgroundContext() (context.Context, func()) {
-	ctx, cancel := context.WithCancel(context.Background())
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		defer signal.Stop(quit)
-		<-quit
-		cancel()
-	}()
-
-	return ctx, cancel
-}
-
-func downloadWithoutResume(length int, urlInput string, filename string, path string) error {
-
-	// compute parts
-	parts := length / downloadPartLimitInBytes
 	diff := length % downloadPartLimitInBytes
 	lensub := downloadPartLimitInBytes
 
 	// download it all at once no need to download in parts
 	// in case file size is less than download part limit in bytes
-	if length < downloadPartLimitInBytes {
-		parts = 1
-		diff = 0
-		lensub = length
+	// if length < downloadPartLimitInBytes {
+	// 	parts = 1
+	// 	diff = 0
+	// 	lensub = length
+	// }
+
+	SimpleLog("Will fetch file %s in %d parts of about %s and reminder of about %s ...\n\n", filename, parts, humanize.Bytes(uint64(lensub)), humanize.Bytes(uint64(diff)))
+	wg.Add(parts - fromPart)
+	waitChan := make(chan struct{}, 3) // max concurrent part downloads
+	for i := fromPart; i < parts; i++ {
+		waitChan <- struct{}{}
+		go func(count int) {
+			defer wg.Done()
+			downloadAndSavePart(urlInput, path, count, parts, lensub, diff)
+			<-waitChan
+		}(i)
+	}
+	wg.Wait()
+	SuccessLog("\nFile downloaded successfully ...\n")
+}
+
+func downloadAndSavePart(urlInput string, path string, i int, parts int, lensub int, diff int) {
+
+	min := lensub * i
+	max := lensub * (i + 1)
+
+	if i == parts-1 {
+		max += diff
 	}
 
-	SuccessLog("Will fetch file %s in %d parts of about %s and reminder of about %s ...\n\n", filename, parts, humanize.Bytes(uint64(lensub)), humanize.Bytes(uint64(diff)))
-
+	fileName := fmt.Sprintf("%s.%d", path, i)
 	// create empty file
-	file, errFileCreate := os.Create(path)
+	file, errFileCreate := os.Create(fileName)
 	if errFileCreate != nil {
 		ErrorLog("Could not create file: %s", errFileCreate)
-		return nil
+		return
 	}
 
-	defer file.Close()
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", urlInput, nil)
+	range_header := "bytes=" + strconv.Itoa(min) + "-" + strconv.Itoa(max)
+	req.Header.Add("Range", range_header)
+	resp, errGet := client.Do(req)
 
-	wg.Add(parts)
+	if errGet != nil {
+		ErrorLog("[ERROR] Could not download chunk %d - %s → %s \n", i, humanize.Bytes(uint64(min)), humanize.Bytes(uint64(max-1)))
+	}
+	defer resp.Body.Close()
 
-	for i := 0; i < parts; i++ {
-
-		min := lensub * i
-		max := lensub * (i + 1)
-
-		if i == parts-1 {
-			max += diff
-		}
-
-		client := &http.Client{}
-		req, _ := http.NewRequest("GET", urlInput, nil)
-		range_header := "bytes=" + strconv.Itoa(min) + "-" + strconv.Itoa(max-1)
-		req.Header.Add("Range", range_header)
-		resp, _ := client.Do(req)
-		defer resp.Body.Close()
-
+	if errGet == nil {
 		if cache, ok := resp.Header["X-Cache"]; ok {
 			if len(cache) != 0 {
 				val := cache[0]
 				if strings.Contains(val, "Hit from cloudfront") {
-					SimpleLog("[%d] Downloading chunk from edge cache %s → %s ...\n", i+1, humanize.Bytes(uint64(min)), humanize.Bytes(uint64(max-1)))
+					SimpleLog("[%d] Downloading chunk from edge cache %s → %s ...\n", i, humanize.Bytes(uint64(min)), humanize.Bytes(uint64(max-1)))
 				} else {
-					SimpleLog("[%d] Downloading chunk from origin %s → %s ...\n", i+1, humanize.Bytes(uint64(min)), humanize.Bytes(uint64(max-1)))
+					SimpleLog("[%d] Downloading chunk from origin %s → %s ...\n", i, humanize.Bytes(uint64(min)), humanize.Bytes(uint64(max-1)))
 				}
 			}
 		} else {
-			SimpleLog("[%d] Downloading chunk %s → %s ...\n", i+1, humanize.Bytes(uint64(min)), humanize.Bytes(uint64(max-1)))
+			SimpleLog("[%d] Downloading chunk %s → %s ...\n", i, humanize.Bytes(uint64(min)), humanize.Bytes(uint64(max-1)))
 		}
 
 		writer := bufio.NewWriter(file)
 		io.Copy(writer, resp.Body)
 		writer.Flush()
-
-		wg.Done()
 	}
 
-	wg.Wait()
-	SuccessLog("\nFile downloaded successfully ...\n")
-
-	return nil
 }
