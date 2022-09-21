@@ -15,12 +15,12 @@ func main() {
 	app.Version = "1.0.0"
 	app.Compiled = time.Now()
 	app.Commands = []cli.Command{}
-	app.Commands = append(app.Commands, command)
+	app.Commands = append(app.Commands, fetch, appendChunks)
 
 	app.Run(os.Args)
 }
 
-var command = cli.Command{
+var fetch = cli.Command{
 	Name:        "fetch",
 	Usage:       "download big files in chunks from remote server",
 	Description: "this command will allow to download a big file in chunks and store it to a defined path, use `-u` to pass the url to fetch from, `-o` to specify the output path, `-f` to specify the filename, `-c` to specify parts download concurrency",
@@ -47,6 +47,30 @@ var command = cli.Command{
 		},
 	},
 	Action: FetchFile(),
+}
+
+var appendChunks = cli.Command{
+	Name:  "append",
+	Usage: "append chunks to single file",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "u",
+			Usage: "input url from where to fetch the file",
+		},
+		cli.StringFlag{
+			Name:  "o",
+			Usage: "output path where to save the file",
+		},
+		cli.StringFlag{
+			Name:  "f",
+			Usage: "the filename to be used",
+		},
+		cli.IntFlag{
+			Name:  "p",
+			Usage: "parts from where to start the download (default: 0)",
+		},
+	},
+	Action: AppendFileChunks(),
 }
 
 func init() {
