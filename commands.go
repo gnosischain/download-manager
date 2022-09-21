@@ -21,7 +21,7 @@ import (
 const FiveGB = 5000000000
 const InMB = 100000000
 
-const downloadPartLimitInBytes = FiveGB
+var downloadPartLimitInBytes = FiveGB
 
 var wg sync.WaitGroup
 
@@ -153,6 +153,17 @@ func computeParts(c *cli.Context) (fromPart int, parts int, length int, path str
 	// compute parts
 	parts = length / downloadPartLimitInBytes
 
+	// change download part limit in bytes
+	// this is just for testing pruposes, to test files that
+	// are enough big to big chunked but not too big to make the test too long
+	// (e.g 1GB)
+	if length < downloadPartLimitInBytes {
+		downloadPartLimitInBytes = InMB
+	}
+
+	// re-compute parts
+	parts = length / downloadPartLimitInBytes
+
 	// download it all at once no need to download in parts
 	// in case file size is less than download part limit in bytes
 	if length < downloadPartLimitInBytes {
@@ -179,8 +190,8 @@ func downloadMultipart(fromPart int, length int, parts int, urlInput string, fil
 		lensub = length
 	}
 
-	SimpleLog("Will fetch file %s from part %d to part %d of about %s and reminder of about %s ...\n\n", filename, fromPart, parts, humanize.Bytes(uint64(lensub)), humanize.Bytes(uint64(diff)))
-	SimpleLog("Downloaded started at %s", started.Format(time.RFC3339))
+	SimpleLog("Will fetch file %s from part %d to part %d of about %s and reminder of about %s ...\n", filename, fromPart, parts, humanize.Bytes(uint64(lensub)), humanize.Bytes(uint64(diff)))
+	SimpleLog("Downloaded started at %s\n", started.Format(time.RFC3339))
 	wg.Add(parts - fromPart)
 	waitChan := make(chan struct{}, 3) // max concurrent part downloads
 	for i := fromPart; i < parts; i++ {
@@ -196,7 +207,15 @@ func downloadMultipart(fromPart int, length int, parts int, urlInput string, fil
 	ended := time.Now()
 
 	SimpleLog("\nDownloaded finished at %s\n", ended.Format(time.RFC3339))
-	SimpleLog("Download took %s hours to complete\n", ended.Sub(started).Hours())
+
+	if ended.Sub(started).Seconds() < 60 {
+		SimpleLog("Download took %f seconds to complete\n", ended.Sub(started).Seconds())
+	} else if ended.Sub(started).Minutes() < 60 {
+		SimpleLog("Download took %f minutes to complete\n", ended.Sub(started).Minutes())
+	} else {
+		SimpleLog("Download took %f hours to complete\n", ended.Sub(started).Hours())
+	}
+
 	SuccessLog("File downloaded successfully ...\n")
 }
 
@@ -257,7 +276,7 @@ func appendParts(fromPart int, parts int, path string) {
 	for i := fromPart; i < parts; i++ {
 		f := fmt.Sprintf("%s.%d", path, i)
 		info, err := os.Stat(f)
-		if err == nil {
+		if err != nil {
 			checkChunkExistence = append(checkChunkExistence, fmt.Sprintf("failed to read %s: %s", f, err.Error()))
 			return
 		}
