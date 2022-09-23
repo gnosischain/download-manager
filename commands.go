@@ -28,7 +28,7 @@ var wg sync.WaitGroup
 func AppendFileChunks() func(c *cli.Context) error {
 	return func(c *cli.Context) error {
 
-		fromPart, parts, _, path, _, _ := computeParts(c)
+		fromPart, parts, _, path, _, _, _ := computeParts(c)
 
 		appendParts(fromPart, parts, path)
 
@@ -39,9 +39,9 @@ func AppendFileChunks() func(c *cli.Context) error {
 func FetchFile() func(c *cli.Context) error {
 	return func(c *cli.Context) error {
 
-		fromPart, parts, length, path, filename, urlInput := computeParts(c)
+		fromPart, parts, length, path, filename, urlInput, concurrency := computeParts(c)
 
-		downloadMultipart(fromPart, length, parts, urlInput, filename, path)
+		downloadMultipart(fromPart, length, parts, urlInput, filename, path, concurrency)
 
 		appendParts(fromPart, parts, path)
 
@@ -49,7 +49,7 @@ func FetchFile() func(c *cli.Context) error {
 	}
 }
 
-func computeParts(c *cli.Context) (fromPart int, parts int, length int, path string, filename string, urlInput string) {
+func computeParts(c *cli.Context) (fromPart int, parts int, length int, path string, filename string, urlInput string, concurrency int) {
 
 	var errWd error
 	path, errWd = os.Getwd()
@@ -60,9 +60,9 @@ func computeParts(c *cli.Context) (fromPart int, parts int, length int, path str
 
 	fromPart = c.Int("p") // index part from where to start
 
-	concurrency := c.Int("c")
+	concurrency = c.Int("c")
 	if concurrency == 0 {
-		concurrency = 3
+		concurrency = 1
 	}
 
 	urlInput = c.String("u")
@@ -175,10 +175,18 @@ func computeParts(c *cli.Context) (fromPart int, parts int, length int, path str
 		return
 	}
 
+	if concurrency > parts {
+		concurrency = parts
+	}
+
+	if concurrency > 10 {
+		concurrency = 10
+	}
+
 	return
 }
 
-func downloadMultipart(fromPart int, length int, parts int, urlInput string, filename string, path string) {
+func downloadMultipart(fromPart int, length int, parts int, urlInput string, filename string, path string, concurrency int) {
 
 	started := time.Now()
 
@@ -193,7 +201,7 @@ func downloadMultipart(fromPart int, length int, parts int, urlInput string, fil
 	SimpleLog("Will fetch file %s from part %d to part %d of about %s and reminder of about %s ...\n", filename, fromPart, parts, humanize.Bytes(uint64(lensub)), humanize.Bytes(uint64(diff)))
 	SimpleLog("Downloaded started at %s\n", started.Format(time.RFC3339))
 	wg.Add(parts - fromPart)
-	waitChan := make(chan struct{}, 3) // max concurrent part downloads
+	waitChan := make(chan struct{}, concurrency) // max concurrent part downloads
 	for i := fromPart; i < parts; i++ {
 		waitChan <- struct{}{}
 		go func(count int) {
