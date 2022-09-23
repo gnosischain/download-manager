@@ -309,11 +309,12 @@ func appendParts(fromPart int, parts int, path string) {
 		ErrorLog("failed to create file %s: %s", path, errTotalFile)
 		return
 	}
-	defer out.Close()
+	// defer out.Close()
 
 	for i := fromPart; i < parts; i++ {
 
 		f := fmt.Sprintf("%s.%d", path, i)
+
 		val, err := os.Open(f)
 		if err != nil {
 			ErrorLog("failed to read %s: %s", f, err.Error())
