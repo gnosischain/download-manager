@@ -278,6 +278,8 @@ func downloadAndSavePart(urlInput string, path string, i int, parts int, lensub 
 
 func appendParts(fromPart int, parts int, path string) {
 
+	WarningLog("[WARNING] Now merging chunks, this may take some time, do not exit this process otherwise all progress will be lost.")
+
 	checkChunkExistence := make([]string, 0, 0)
 
 	// quickly check if there are all parts
@@ -333,6 +335,8 @@ func appendParts(fromPart int, parts int, path string) {
 			ErrorLog("failed to delete chunk %s: %s", f, errDeleteChunk.Error())
 			break
 		}
+
+		SimpleLog("Chunk %d/%d was merged\n", i+1, parts)
 	}
 
 	stat, errStat := out.Stat()
@@ -342,4 +346,5 @@ func appendParts(fromPart int, parts int, path string) {
 	}
 
 	SimpleLog("File Size: %d\n", stat.Size())
+	SimpleLog("Process has now finished\n")
 }
