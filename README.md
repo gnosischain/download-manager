@@ -1,15 +1,11 @@
 
 # Download Manager
 
-Utility CLI to facilitate downloads of big files in chunks.
+Utility CLI to facilitate downloads of big files in chunks. This CLI is still in alpha phase and experimental.
 
 # How to use it
 
-Download the CLI from `main` branch (does not support resume download from part)
-
-- `curl https://raw.githubusercontent.com/gnosischain/download-manager/main/releases/linux/amd64/download-manager --output ./download-manager`
-
-[Experimental] Download the CLI from `multipart` branch (does not support resume download from part)
+Download the CLI from `multipart` branch
 
 - `curl https://raw.githubusercontent.com/gnosischain/download-manager/multipart/releases/linux/amd64/download-manager --output ./download-manager`
 
@@ -24,3 +20,7 @@ If not output path is passed, file will be downloaded in current working directo
 Otherwise specify an output path explicitly.
 
 - `download-manager fetch -u {https://url-to-file} -f {filename} -o {output-path}`
+
+Resume download from specific part
+
+- `download-manager fetch -u {https://url-to-file} -f {filename} -p {part-number}`
