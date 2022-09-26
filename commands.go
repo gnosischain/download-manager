@@ -322,14 +322,16 @@ func appendParts(fromPart int, parts int, path string) {
 			ErrorLog("failed to read %s: %s", f, err.Error())
 			break
 		}
-		defer val.Close()
 
 		_, errMergeChunk := io.Copy(out, val)
 		if errMergeChunk != nil {
+			defer val.Close()
 			ErrorLog("failed to append chunk %s: %s", f, errMergeChunk.Error())
 			break
 		}
 
+		// close file then remove
+		val.Close()
 		errDeleteChunk := os.Remove(f)
 		if errDeleteChunk != nil {
 			ErrorLog("failed to delete chunk %s: %s", f, errDeleteChunk.Error())
