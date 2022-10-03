@@ -7,7 +7,7 @@ Utility CLI to facilitate downloads of big files in chunks. This CLI is still in
 
 Download the CLI from `multipart` branch
 
-- `curl https://raw.githubusercontent.com/gnosischain/download-manager/multipart/releases/linux/amd64/download-manager --output ./download-manager`
+- `curl https://raw.githubusercontent.com/gnosischain/download-manager/main/releases/linux/amd64/download-manager --output ./download-manager`
 
 Make it executable
 
